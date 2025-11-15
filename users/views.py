@@ -3,7 +3,7 @@ from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from users.models import User
-from users.permissions import IsOwnerOrReadOnly
+from users.permissions import IsOwnerOrReadOnly, IsOwner
 from users.serializers import UserSerializer, PublicUserSerializer
 
 
@@ -15,7 +15,7 @@ class UserCreateAPIView(generics.CreateAPIView):
     permission_classes = (AllowAny,)
 
     def perform_create(self, serializer):
-        user = serializer.save()
+        user = serializer.save(is_active=True)
         user.set_password(user.password)
         user.save()
 
@@ -45,11 +45,11 @@ class UserUpdateAPIView(generics.UpdateAPIView):
 
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    permission_classes = (IsAuthenticated, IsOwner)
 
 
 class UserDestroyAPIView(generics.DestroyAPIView):
     """Удаление пользователя"""
 
     queryset = User.objects.all()
-    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    permission_classes = (IsAuthenticated, IsOwner)
