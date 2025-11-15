@@ -24,8 +24,7 @@ class UserRetrieveAPIView(generics.RetrieveAPIView):
     """Просмотр пользователя"""
 
     queryset = User.objects.all()
-    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
 
     def get_serializer_class(self):
         if self.request.user == self.get_object():
@@ -38,8 +37,7 @@ class UserListAPIView(generics.ListAPIView):
 
     serializer_class = PublicUserSerializer
     queryset = User.objects.all()
-    # permission_classes = (IsAuthenticated,)
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
 
 class UserUpdateAPIView(generics.UpdateAPIView):
@@ -47,13 +45,11 @@ class UserUpdateAPIView(generics.UpdateAPIView):
 
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
 
 
 class UserDestroyAPIView(generics.DestroyAPIView):
     """Удаление пользователя"""
 
     queryset = User.objects.all()
-    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)

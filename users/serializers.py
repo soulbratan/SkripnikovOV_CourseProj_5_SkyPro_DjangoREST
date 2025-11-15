@@ -23,7 +23,5 @@ class PublicUserSerializer(ModelSerializer):
             "phone",
             "tg_id",
             "avatar",
-            "date_joined",
-            "last_login",
         ]
         read_only_fields = fields
