@@ -31,3 +31,29 @@ class UserRetrieveAPIView(generics.RetrieveAPIView):
         if self.request.user == self.get_object():
             return UserSerializer
         return PublicUserSerializer
+
+
+class UserListAPIView(generics.ListAPIView):
+    """Просмотр всех пользователей"""
+
+    serializer_class = PublicUserSerializer
+    queryset = User.objects.all()
+    # permission_classes = (IsAuthenticated,)
+    permission_classes = (AllowAny,)
+
+
+class UserUpdateAPIView(generics.UpdateAPIView):
+    """Изменение пользователя"""
+
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
+    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    permission_classes = (AllowAny,)
+
+
+class UserDestroyAPIView(generics.DestroyAPIView):
+    """Удаление пользователя"""
+
+    queryset = User.objects.all()
+    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    permission_classes = (AllowAny,)
