@@ -24,7 +24,8 @@ class UserRetrieveAPIView(generics.RetrieveAPIView):
     """Просмотр пользователя"""
 
     queryset = User.objects.all()
-    permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    # permission_classes = (IsAuthenticated, IsOwnerOrReadOnly)
+    permission_classes = (AllowAny,)
 
     def get_serializer_class(self):
         if self.request.user == self.get_object():

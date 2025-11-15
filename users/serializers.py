@@ -21,7 +21,7 @@ class PublicUserSerializer(ModelSerializer):
             "email",
             "first_name",
             "phone",
-            "country",
+            "tg_id",
             "avatar",
             "date_joined",
             "last_login",
