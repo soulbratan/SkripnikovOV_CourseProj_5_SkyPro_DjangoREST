@@ -5,7 +5,11 @@ class IsOwner(permissions.BasePermission):
     """Пользовательский пермишин для проверки владельца."""
 
     def has_object_permission(self, request, view, obj):
-        return obj.owner == request.user
+        # Для модели User
+        if hasattr(obj, 'email'):
+            return obj == request.user
+        # Для других моделей
+        return obj.user == request.user
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -14,4 +18,9 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
             return request.user.is_authenticated
-        return obj == request.user
+
+        # Для модели User
+        if hasattr(obj, 'email'):
+            return obj == request.user
+        # Для других моделей
+        return obj.user == request.user

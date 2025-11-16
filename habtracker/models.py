@@ -1,16 +1,18 @@
 from django.db import models
 from django.conf import settings
-from django.utils import timezone
-from .validators import validate_habit_before_save
+from django.core.exceptions import ValidationError
 
 
 class Habit(models.Model):
-    """Модель привычки"""
+    FREQUENCY_CHOICES = [
+        ('daily', 'Ежедневно'),
+        ('weekly', 'Еженедельно'),
+    ]
 
-    owner = models.ForeignKey(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        verbose_name="Владелец",
+        verbose_name="Пользователь",
         related_name="habits"
     )
     place = models.CharField(
@@ -19,7 +21,7 @@ class Habit(models.Model):
         help_text="Место, в котором необходимо выполнять привычку"
     )
     time = models.DateTimeField(
-        verbose_name="Дата и время",
+        verbose_name="Время",
         help_text="Дата и время, когда необходимо выполнять привычку"
     )
     action = models.CharField(
@@ -29,8 +31,7 @@ class Habit(models.Model):
     )
     is_pleasant = models.BooleanField(
         default=False,
-        verbose_name="Признак приятной привычки",
-        help_text="Привычка, которую можно привязать к выполнению полезной привычки"
+        verbose_name="Признак приятной привычки"
     )
     related_habit = models.ForeignKey(
         'self',
@@ -40,35 +41,31 @@ class Habit(models.Model):
         verbose_name="Связанная привычка",
         help_text="Привычка, которая связана с другой привычкой"
     )
-    periodicity = models.PositiveIntegerField(
-        default=1,
-        verbose_name="Периодичность (в днях)",
-        help_text="Периодичность выполнения привычки для напоминания в днях"
+    frequency = models.CharField(
+        max_length=10,
+        choices=FREQUENCY_CHOICES,
+        default='daily',
+        verbose_name="Периодичность",
+        help_text="Периодичность выполнения привычки"
     )
     reward = models.CharField(
-        max_length=500,
+        max_length=255,
         blank=True,
         null=True,
         verbose_name="Вознаграждение",
         help_text="Чем пользователь должен себя вознаградить после выполнения"
     )
-    execution_time = models.PositiveIntegerField(
+    duration = models.PositiveIntegerField(
         verbose_name="Время на выполнение (в секундах)",
         help_text="Время, которое предположительно потратит пользователь на выполнение привычки"
     )
     is_public = models.BooleanField(
         default=False,
-        verbose_name="Признак публичности",
-        help_text="Привычки можно публиковать в общий доступ"
+        verbose_name="Признак публичности"
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"
-    )
-    last_completed = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="Последнее выполнение"
     )
 
     class Meta:
@@ -77,28 +74,8 @@ class Habit(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.owner.email}: {self.action} в {self.time.strftime('%d.%m.%Y %H:%M')}"
+        return f"{self.user.email}: {self.action}"
 
     def clean(self):
-        """Валидация данных при сохранении"""
-        validate_habit_before_save(self)
-
-    def save(self, *args, **kwargs):
-        """Переопределение save с валидацией"""
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def mark_completed(self):
-        """Отметить привычку как выполненную"""
-        self.last_completed = timezone.now()
-        self.save()
-
-    @property
-    def time_only(self):
-        """Возвращает только время (для обратной совместимости)"""
-        return self.time.time()
-
-    @property
-    def date_only(self):
-        """Возвращает только дату"""
-        return self.time.date()
+        from .validators import validate_habit
+        validate_habit(self)
