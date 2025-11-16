@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
 from .validators import validate_habit_before_save
