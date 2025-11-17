@@ -1,10 +1,12 @@
-from rest_framework import generics
+from rest_framework import generics, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Habit
 from .serializers import HabitSerializer, PublicHabitSerializer
 from .permissions import IsOwner
+from .filters import HabitFilter
 
 
 class HabitPagination(PageNumberPagination):
@@ -19,6 +21,11 @@ class HabitListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = HabitSerializer
     permission_classes = [IsAuthenticated, IsOwner]
     pagination_class = HabitPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = HabitFilter
+    search_fields = ['place', 'action']
+    ordering_fields = ['time', 'created_at']
+    ordering = ['time']
 
     def get_queryset(self):
         return Habit.objects.filter(user=self.request.user)
@@ -32,6 +39,8 @@ class HabitRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     serializer_class = HabitSerializer
     permission_classes = [IsAuthenticated, IsOwner]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = HabitFilter
 
     def get_queryset(self):
         return Habit.objects.filter(user=self.request.user)
@@ -43,6 +52,10 @@ class PublicHabitListAPIView(generics.ListAPIView):
     serializer_class = PublicHabitSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = HabitPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = HabitFilter
+    search_fields = ['place', 'action', 'user__email']
+    ordering_fields = ['time', 'created_at']
 
     def get_queryset(self):
         return Habit.objects.filter(is_public=True)

@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "django_filters",
     "corsheaders",
     "drf_yasg",
+    "django_celery_beat",
 ]
 
 
@@ -140,3 +141,26 @@ SIMPLE_JWT = {
 
 TELEGRAM_URL = "https://api.telegram.org/bot"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+FRONTEND_URL = "http://localhost:8000"
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
+
+
+# Celery Configuration
+CELERY_BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = False
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+CELERY_BEAT_SCHEDULE = {
+    "send-habit-reminders": {
+        "task": "habtracker.tasks.send_habit_reminders",
+        "schedule": timedelta(minutes=1),  # Проверяем каждую минуту
+    },
+}
