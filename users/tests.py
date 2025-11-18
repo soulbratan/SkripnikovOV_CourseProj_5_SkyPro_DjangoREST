@@ -4,6 +4,9 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from users.serializers import UserSerializer, PublicUserSerializer
 from rest_framework.exceptions import ErrorDetail
+from rest_framework.test import APITestCase
+from rest_framework import status
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -271,3 +274,192 @@ class UserSerializerTest(TestCase):
             # original first_name не должен измениться
             self.user.refresh_from_db()
             self.assertEqual(self.user.first_name, 'John')
+
+
+# ТЕСТЫ ДЛЯ ПРЕДСТАВЛЕНИЙ -----------------------------------------------
+class UserViewsTest(APITestCase):
+    """Тесты для представлений пользователя"""
+
+    def setUp(self):
+        """Настройка тестовых данных"""
+        self.user_data = {
+            'email': 'test@example.com',
+            'password': 'testpass123',
+            'first_name': 'John',
+            'last_name': 'Doe'
+        }
+        self.user = User.objects.create(**self.user_data)
+
+        self.other_user = User.objects.create(
+            email='other@example.com',
+            password='otherpass123',
+            first_name='Other'
+        )
+
+    def test_user_registration_success(self):
+        """Тест успешной регистрации пользователя"""
+        url = reverse('users:user-create')
+        data = {
+            'email': 'newuser@example.com',
+            'password': 'newpass123',
+            'first_name': 'New',
+            'last_name': 'User',
+            'phone': '+79991234567'
+        }
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(User.objects.filter(email='newuser@example.com').exists())
+
+        # Проверяем что пароль хешируется
+        new_user = User.objects.get(email='newuser@example.com')
+        self.assertTrue(new_user.check_password('newpass123'))
+        self.assertNotEqual(new_user.password, 'newpass123')  # Пароль должен быть хеширован
+
+    def test_user_registration_invalid_data(self):
+        """Тест регистрации с невалидными данными"""
+        url = reverse('users:user-create')
+        data = {
+            'email': 'invalid-email',
+            'password': '123'  # Слишком короткий пароль
+        }
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+    def test_user_login_success(self):
+        """Тест успешного входа пользователя"""
+        # Сначала регистрируем.
+        url_reg = reverse('users:user-create')
+        # Потом логин
+        url = reverse('users:login')
+        data = {
+            'email': 'login@example.com',
+            'password': 'loginpass123'
+        }
+
+        self.client.post(url_reg, data)
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+    def test_user_login_invalid_credentials(self):
+        """Тест входа с неверными учетными данными"""
+
+        url = reverse('users:login')
+        data = {
+            'email': 'test@example.com',
+            'password': 'wrongpassword'
+        }
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_own_profile_authenticated(self):
+        """Тест получения своего профиля аутентифицированным пользователем"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-retrieve', args=[self.user.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], self.user.email)
+        self.assertEqual(response.data['first_name'], self.user.first_name)
+        # Должны видеть все свои данные (UserSerializer)
+        self.assertIn('last_name', response.data)
+
+    def test_get_other_user_profile_authenticated(self):
+        """Тест получения чужого профиля аутентифицированным пользователем"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-retrieve', args=[self.other_user.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], self.other_user.email)
+        # Должны видеть только публичные данные (PublicUserSerializer)
+        self.assertNotIn('last_name', response.data)
+
+    def test_get_profile_unauthenticated(self):
+        """Тест получения профиля без аутентификации"""
+        url = reverse('users:user-retrieve', args=[self.user.id])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_own_profile(self):
+        """Тест обновления своего профиля"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-update', args=[self.user.id])
+        data = {
+            'first_name': 'UpdatedName',
+            'phone': '+79998887766'
+        }
+
+        response = self.client.patch(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'UpdatedName')
+        self.assertEqual(self.user.phone, '+79998887766')
+
+    def test_update_other_user_profile(self):
+        """Тест попытки обновления чужого профиля"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-update', args=[self.other_user.id])
+        data = {'first_name': 'Hacked'}
+
+        response = self.client.patch(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_own_profile(self):
+        """Тест удаления своего профиля"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-delete', args=[self.user.id])
+
+        response = self.client.delete(url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(id=self.user.id).exists())
+
+    def test_delete_other_user_profile(self):
+        """Тест попытки удаления чужого профиля"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-delete', args=[self.other_user.id])
+
+        response = self.client.delete(url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_users_authenticated(self):
+        """Тест получения списка пользователей аутентифицированным пользователем"""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('users:user-list')
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Должны видеть только публичные данные всех пользователей
+        users_data = response.data['results']  # Учитываем пагинацию
+        self.assertTrue(len(users_data) >= 2)  # Как минимум 2 пользователя
+
+        for user_data in users_data:
+            self.assertIn('email', user_data)
+            self.assertIn('first_name', user_data)
+            self.assertNotIn('last_name', user_data)  # Приватные данные скрыты
+
+    def test_list_users_unauthenticated(self):
+        """Тест получения списка пользователей без аутентификации"""
+        url = reverse('users:user-list')
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
