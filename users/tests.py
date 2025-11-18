@@ -9,6 +9,7 @@ from users.permissions import IsOwner, IsOwnerOrReadOnly
 
 User = get_user_model()
 
+
 # ТЕСТИРОВАНИЕ МОДЕЛИ USER---------------------------------------------------
 class UserModelTest(TestCase):
     """Тесты для модели User"""
@@ -96,12 +97,10 @@ class UserModelTest(TestCase):
         User.objects.create(email="", password="testpassword123")
         self.assertRaises(ValueError)
 
-
     def test_password_required(self):
         """Тест что пароль обязателен для заполнения"""
         User.objects.create(email="test2@example.com", password="")
         self.assertRaises(ValueError)
-
 
     def test_user_ordering(self):
         """Тест порядка сортировки пользователей"""
@@ -259,7 +258,7 @@ class UserSerializerTest(TestCase):
     def test_public_user_serializer_all_fields_read_only(self):
         """Тест что все поля PublicUserSerializer только для чтения"""
         serializer = PublicUserSerializer(self.user)
-        data = serializer.data
+        serializer.data
 
         # Попытка изменить данные через сериализатор
         update_data = {"first_name": "Hacked"}
@@ -269,7 +268,7 @@ class UserSerializerTest(TestCase):
         self.assertTrue(serializer.is_valid())
         # Но при сохранении изменения не применятся
         if serializer.is_valid():
-            updated_user = serializer.save()
+            serializer.save()
             # original first_name не должен измениться
             self.user.refresh_from_db()
             self.assertEqual(self.user.first_name, "John")

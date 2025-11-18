@@ -3,6 +3,7 @@ from .models import Habit, HabitCompletion
 from .validators import validate_habit
 from django.core.exceptions import ValidationError
 
+
 class HabitSerializer(serializers.ModelSerializer):
     """Сериализатор для привычек"""
 

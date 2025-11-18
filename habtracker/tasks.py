@@ -15,9 +15,9 @@ def create_reminder_message(habit):
 
 Напоминание о твоей привычке:
 Место📍 {habit.place}
-Начало 🕐 {habit.time.strftime("%H:%M")}  
-Действие 💪 {habit.action}
-Время ⏱ {habit.duration} секунд
+Начало🕐 {habit.time.strftime("%H:%M")}
+Действие💪 {habit.action}
+Время⏱ {habit.duration} секунд
 
 Удачи!
 """.strip()

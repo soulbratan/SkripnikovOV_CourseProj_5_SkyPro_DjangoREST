@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 # from django.utils import timezone
 # from datetime import timedelta
 
+
 def validate_habit(habit):
     """Полная валидация привычки согласно заданию"""
     errors = {}
