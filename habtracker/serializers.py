@@ -9,11 +9,11 @@ class HabitSerializer(serializers.ModelSerializer):
     class Meta:
         model = Habit
         fields = [
-            'id', 'user', 'place', 'time', 'action', 'is_pleasant',
-            'related_habit', 'frequency', 'reward', 'duration',
-            'is_public', 'created_at'
+            "id", "user", "place", "time", "action", "is_pleasant",
+            "related_habit", "frequency", "reward", "duration",
+            "is_public", "created_at"
         ]
-        read_only_fields = ['user', 'created_at']
+        read_only_fields = ["user", "created_at"]
 
     def validate(self, data):
         instance = Habit(**data)
@@ -24,20 +24,20 @@ class HabitSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
+        validated_data["user"] = self.context["request"].user
         return super().create(validated_data)
 
 
 class PublicHabitSerializer(serializers.ModelSerializer):
     """Сериализатор для публичных привычек"""
 
-    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
         model = Habit
         fields = [
-            'id', 'user_email', 'place', 'time', 'action',
-            'frequency', 'duration', 'created_at'
+            "id", "user_email", "place", "time", "action",
+            "frequency", "duration", "created_at"
         ]
         read_only_fields = fields
 
@@ -45,5 +45,5 @@ class PublicHabitSerializer(serializers.ModelSerializer):
 class HabitCompletionSerializer(serializers.ModelSerializer):
     class Meta:
         model = HabitCompletion
-        fields = ['id', 'habit', 'completed_at', 'is_successful']
-        read_only_fields = ['completed_at']
+        fields = ["id", "habit", "completed_at", "is_successful"]
+        read_only_fields = ["completed_at"]

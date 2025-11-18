@@ -104,4 +104,4 @@ class HabitCompletion(models.Model):
         ordering = ["-completed_at"]
 
     def __str__(self):
-        return f"{self.habit.action} - {self.completed_at.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.habit.action} - {self.completed_at.strftime("%Y-%m-%d %H:%M")}"

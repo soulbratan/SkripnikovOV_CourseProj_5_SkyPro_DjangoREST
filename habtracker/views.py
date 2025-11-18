@@ -11,7 +11,7 @@ from .filters import HabitFilter
 
 class HabitPagination(PageNumberPagination):
     page_size = 5
-    page_size_query_param = 'page_size'
+    page_size_query_param = "page_size"
     max_page_size = 50
 
 
@@ -23,9 +23,9 @@ class HabitListCreateAPIView(generics.ListCreateAPIView):
     pagination_class = HabitPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = HabitFilter
-    search_fields = ['place', 'action']
-    ordering_fields = ['time', 'created_at']
-    ordering = ['time']
+    search_fields = ["place", "action"]
+    ordering_fields = ["time", "created_at"]
+    ordering = ["time"]
 
     def get_queryset(self):
         return Habit.objects.filter(user=self.request.user)
@@ -54,8 +54,8 @@ class PublicHabitListAPIView(generics.ListAPIView):
     pagination_class = HabitPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = HabitFilter
-    search_fields = ['place', 'action', 'user__email']
-    ordering_fields = ['time', 'created_at']
+    search_fields = ["place", "action", "user__email"]
+    ordering_fields = ["time", "created_at"]
 
     def get_queryset(self):
         return Habit.objects.filter(is_public=True)

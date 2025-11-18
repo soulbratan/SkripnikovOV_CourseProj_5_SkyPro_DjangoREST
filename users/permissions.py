@@ -6,7 +6,7 @@ class IsOwner(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         # Для модели User
-        if hasattr(obj, 'email'):
+        if hasattr(obj, "email"):
             return obj == request.user
         # Для других моделей
         return obj.user == request.user
@@ -20,7 +20,7 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
             return request.user.is_authenticated
 
         # Для модели User
-        if hasattr(obj, 'email'):
+        if hasattr(obj, "email"):
             return obj == request.user
         # Для других моделей
         return obj.user == request.user
