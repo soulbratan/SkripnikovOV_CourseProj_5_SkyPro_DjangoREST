@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Habit
+from .models import Habit, HabitCompletion
 from .validators import validate_habit
 from django.core.exceptions import ValidationError
 
@@ -40,3 +40,10 @@ class PublicHabitSerializer(serializers.ModelSerializer):
             'frequency', 'duration', 'created_at'
         ]
         read_only_fields = fields
+
+
+class HabitCompletionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HabitCompletion
+        fields = ['id', 'habit', 'completed_at', 'is_successful']
+        read_only_fields = ['completed_at']

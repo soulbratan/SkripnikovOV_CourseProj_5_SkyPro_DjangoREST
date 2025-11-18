@@ -163,4 +163,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "habtracker.tasks.send_habit_reminders",
         "schedule": timedelta(minutes=1),  # Проверяем каждую минуту
     },
+    "check-habit-reminders": {
+        "task": "habtracker.tasks.check_habits_now",
+        "schedule": timedelta(minutes=1),  # Проверяем каждую минуту
+    },
 }

@@ -4,7 +4,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Habit
-from .serializers import HabitSerializer, PublicHabitSerializer
+from .serializers import HabitSerializer, PublicHabitSerializer, HabitCompletionSerializer
 from .permissions import IsOwner
 from .filters import HabitFilter
 
@@ -59,3 +59,17 @@ class PublicHabitListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         return Habit.objects.filter(is_public=True)
+
+
+class HabitCompletionCreateAPIView(generics.CreateAPIView):
+    """Отметка выполнения привычки"""
+
+    serializer_class = HabitCompletionSerializer
+    permission_classes = [IsAuthenticated, IsOwner]
+
+    def get_queryset(self):
+        return Habit.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        habit = self.get_object()
+        serializer.save(habit=habit)

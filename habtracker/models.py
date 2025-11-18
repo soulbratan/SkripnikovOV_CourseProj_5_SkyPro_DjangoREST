@@ -1,13 +1,11 @@
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 
 class Habit(models.Model):
-    FREQUENCY_CHOICES = [
-        ('daily', 'Ежедневно'),
-        ('weekly', 'Еженедельно'),
-    ]
+    """Модель пользователя приложения"""
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -20,9 +18,9 @@ class Habit(models.Model):
         verbose_name="Место",
         help_text="Место, в котором необходимо выполнять привычку"
     )
-    time = models.DateTimeField(
-        verbose_name="Время",
-        help_text="Дата и время, когда необходимо выполнять привычку"
+    time = models.TimeField(
+        verbose_name="Время выполнения",
+        help_text="Время, когда необходимо выполнять привычку"
     )
     action = models.CharField(
         max_length=500,
@@ -34,19 +32,18 @@ class Habit(models.Model):
         verbose_name="Признак приятной привычки"
     )
     related_habit = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="Связанная привычка",
         help_text="Привычка, которая связана с другой привычкой"
     )
-    frequency = models.CharField(
-        max_length=10,
-        choices=FREQUENCY_CHOICES,
-        default='daily',
-        verbose_name="Периодичность",
-        help_text="Периодичность выполнения привычки"
+    frequency = models.PositiveIntegerField(  # ⚡ ИЗМЕНЕНО: число вместо строки
+        default=1,
+        verbose_name="Периодичность (в днях)",
+        help_text="Периодичность выполнения привычки в днях (1-7)",
+        validators=[MinValueValidator(1), MaxValueValidator(7)]
     )
     reward = models.CharField(
         max_length=255,
@@ -63,6 +60,10 @@ class Habit(models.Model):
         default=False,
         verbose_name="Признак публичности"
     )
+    start_date = models.DateField(  # ⚡ ДОБАВЛЕНО: дата начала привычки
+        default=timezone.now,
+        verbose_name="Дата начала привычки"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"
@@ -71,7 +72,7 @@ class Habit(models.Model):
     class Meta:
         verbose_name = "Привычка"
         verbose_name_plural = "Привычки"
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.user.email}: {self.action}"
@@ -79,3 +80,28 @@ class Habit(models.Model):
     def clean(self):
         from .validators import validate_habit
         validate_habit(self)
+
+
+class HabitCompletion(models.Model):
+    habit = models.ForeignKey(
+        Habit,
+        on_delete=models.CASCADE,
+        verbose_name="Привычка",
+        related_name="completions"
+    )
+    completed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Время выполнения"
+    )
+    is_successful = models.BooleanField(
+        default=True,
+        verbose_name="Успешно выполнено"
+    )
+
+    class Meta:
+        verbose_name = "Выполнение привычки"
+        verbose_name_plural = "Выполнения привычек"
+        ordering = ["-completed_at"]
+
+    def __str__(self):
+        return f"{self.habit.action} - {self.completed_at.strftime('%Y-%m-%d %H:%M')}"

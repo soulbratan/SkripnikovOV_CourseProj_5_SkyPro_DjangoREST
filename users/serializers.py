@@ -7,8 +7,12 @@ class UserSerializer(ModelSerializer):
 
     class Meta:
         model = User
-        fields = "__all__"
-        extra_kwargs = {"password": {"write_only": True}}
+        fields = ["id", "email", "first_name", "last_name", "phone", "tg_id", "avatar", "password"]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            "password": {"write_only": True},
+            "email": {"required": True}
+        }
 
 
 class PublicUserSerializer(ModelSerializer):
