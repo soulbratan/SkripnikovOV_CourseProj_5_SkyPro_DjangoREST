@@ -4,9 +4,10 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from users.serializers import UserSerializer, PublicUserSerializer
 from rest_framework.exceptions import ErrorDetail
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIRequestFactory
 from rest_framework import status
 from django.urls import reverse
+from users.permissions import IsOwner, IsOwnerOrReadOnly
 
 User = get_user_model()
 
@@ -463,3 +464,80 @@ class UserViewsTest(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ТЕСТЫ ДЛЯ ПЕРМИШИНОВ -----------------------------------------------
+class PermissionsTest(TestCase):
+    """Тесты для кастомных разрешений"""
+
+    def setUp(self):
+        """Настройка тестовых данных"""
+        self.factory = APIRequestFactory()
+        self.user = User.objects.create(
+            email='test@example.com',
+            password='testpass123',
+        )
+        self.other_user = User.objects.create(
+            email='other@example.com',
+            password='otherpass123'
+        )
+
+    def test_is_owner_permission_same_user(self):
+        """Тест IsOwner разрешения для владельца объекта"""
+        permission = IsOwner()
+        request = self.factory.get('/')
+        request.user = self.user
+
+        # Для модели User
+        self.assertTrue(permission.has_object_permission(request, None, self.user))
+
+    def test_is_owner_permission_different_user(self):
+        """Тест IsOwner разрешения для чужого пользователя"""
+        permission = IsOwner()
+        request = self.factory.get('/')
+        request.user = self.other_user
+
+        # Для модели User - другой пользователь
+        self.assertFalse(permission.has_object_permission(request, None, self.user))
+
+    def test_is_owner_or_read_only_safe_methods(self):
+        """Тест IsOwnerOrReadOnly для безопасных методов"""
+        permission = IsOwnerOrReadOnly()
+
+        # Тестируем безопасные методы
+        safe_methods = ['GET', 'HEAD', 'OPTIONS']
+        for method in safe_methods:
+            request = self.factory.get('/')
+            request.method = method
+            request.user = self.other_user  # Чужой пользователь
+
+            # Должен иметь доступ для безопасных методов
+            self.assertTrue(permission.has_object_permission(request, None, self.user))
+
+    def test_is_owner_or_read_only_unsafe_methods_owner(self):
+        """Тест IsOwnerOrReadOnly для небезопасных методов владельцем"""
+        permission = IsOwnerOrReadOnly()
+
+        # Тестируем небезопасные методы для владельца
+        unsafe_methods = ['POST', 'PUT', 'PATCH', 'DELETE']
+        for method in unsafe_methods:
+            request = self.factory.get('/')
+            request.method = method
+            request.user = self.user  # Владелец
+
+            # Должен иметь доступ для небезопасных методов
+            self.assertTrue(permission.has_object_permission(request, None, self.user))
+
+    def test_is_owner_or_read_only_unsafe_methods_non_owner(self):
+        """Тест IsOwnerOrReadOnly для небезопасных методов не-владельцем"""
+        permission = IsOwnerOrReadOnly()
+
+        # Тестируем небезопасные методы для не-владельца
+        unsafe_methods = ['POST', 'PUT', 'PATCH', 'DELETE']
+        for method in unsafe_methods:
+            request = self.factory.get('/')
+            request.method = method
+            request.user = self.other_user  # Не владелец
+
+            # Не должен иметь доступ для небезопасных методов
+            self.assertFalse(permission.has_object_permission(request, None, self.user))
