@@ -5,6 +5,12 @@ from habtracker.permissions import IsPublicReadOnly, IsOwnerOrReadOnly, IsOwner
 from users.models import User
 from habtracker.models import Habit, HabitCompletion
 from habtracker.validators import validate_habit
+from habtracker.services import send_tg_message
+from habtracker.tasks import create_reminder_message, send_habit_reminders, check_habits_now
+from django.conf import settings
+from unittest.mock import patch, MagicMock
+from datetime import datetime, time, date, timedelta
+import pytz
 
 # ТЕСТЫ ДЛЯ МОДЕЛИ HABIT---------------------------------------
 class HabitModelTest(TestCase):
@@ -647,3 +653,351 @@ class PermissionsTest(TestCase):
         unsafe_request = self.factory.post('/')
         unsafe_request.method = 'POST'
         self.assertFalse(permission.has_permission(unsafe_request, None))
+
+
+# ТЕСТЫ ДЛЯ SERVICES----------------------------------------------
+class ServicesTest(TestCase):
+    """Тесты для сервисов"""
+
+    def setUp(self):
+        """Настройка тестовых данных"""
+        self.user = User.objects.create(
+            email='test@example.com',
+            password='testpass123',
+            first_name='Иван',
+            tg_id='123456789'
+        )
+
+        self.habit = Habit.objects.create(
+            user=self.user,
+            place='Парк',
+            time=time(9, 0, 0),
+            action='Утренняя пробежка',
+            duration=120,
+            frequency=1
+        )
+
+    @patch('habtracker.services.requests.get')
+    def test_send_tg_message_success(self, mock_requests_get):
+        """Тест успешной отправки сообщения в Telegram"""
+        # Мокаем успешный ответ от Telegram API
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status.return_value = None
+        mock_requests_get.return_value = mock_response
+
+        chat_id = '123456789'
+        message = 'Тестовое сообщение'
+
+        result = send_tg_message(chat_id, message)
+
+        # Проверяем что функция возвращает True при успехе
+        self.assertTrue(result)
+
+        # Проверяем что requests.get был вызван с правильными параметрами
+        mock_requests_get.assert_called_once()
+        args, kwargs = mock_requests_get.call_args
+        self.assertIn(settings.TELEGRAM_URL, args[0])
+        self.assertIn(settings.TELEGRAM_TOKEN, args[0])
+        self.assertIn('sendMessage', args[0])
+
+        # Проверяем параметры запроса
+        self.assertEqual(kwargs['params']['chat_id'], chat_id)
+        self.assertEqual(kwargs['params']['text'], message)
+        self.assertEqual(kwargs['timeout'], 10)
+
+    @patch('habtracker.services.requests.get')
+    def test_send_tg_message_failure(self, mock_requests_get):
+        """Тест неуспешной отправки сообщения в Telegram"""
+        # Мокаем исключение при запросе
+        mock_requests_get.side_effect = Exception('Network error')
+
+        chat_id = '123456789'
+        message = 'Тестовое сообщение'
+
+        result = send_tg_message(chat_id, message)
+
+        # Проверяем что функция возвращает False при ошибке
+        self.assertFalse(result)
+
+    @patch('habtracker.services.requests.get')
+    def test_send_tg_message_http_error(self, mock_requests_get):
+        """Тест отправки сообщения с HTTP ошибкой"""
+        # Мокаем HTTP ошибку
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.raise_for_status.side_effect = Exception('HTTP Error')
+        mock_requests_get.return_value = mock_response
+
+        chat_id = '123456789'
+        message = 'Тестовое сообщение'
+
+        result = send_tg_message(chat_id, message)
+
+        # Проверяем что функция возвращает False при HTTP ошибке
+        self.assertFalse(result)
+
+    def test_send_tg_message_empty_chat_id(self):
+        """Тест отправки сообщения с пустым chat_id"""
+        result = send_tg_message('', 'Тестовое сообщение')
+        self.assertFalse(result)
+
+        result = send_tg_message(None, 'Тестовое сообщение')
+        self.assertFalse(result)
+
+    def test_create_reminder_message(self):
+        """Тест создания сообщения напоминания"""
+        message = create_reminder_message(self.habit)
+
+        # Проверяем что все ключевые элементы присутствуют в сообщении
+        self.assertIn('Иван', message)  # Имя пользователя
+        self.assertIn(self.habit.place, message)  # Место
+        self.assertIn(self.habit.action, message)  # Действие
+        self.assertIn(str(self.habit.duration), message)  # Длительность
+        self.assertIn(self.habit.time.strftime("%H:%M"), message)  # Время
+
+        # Проверяем структуру сообщения
+        self.assertIn('👋', message)  # Приветствие
+        self.assertIn('Напоминание', message)
+        self.assertIn('Место', message)
+        self.assertIn('Действие', message)
+        self.assertIn('Время', message)
+
+
+# ТЕСТЫ ДЛЯ tasks -----------------------------------------
+class TasksTest(TestCase):
+    """Тесты для Celery задач"""
+
+    def setUp(self):
+        """Настройка тестовых данных"""
+        self.user_with_tg = User.objects.create(
+            email='tguser@example.com',
+            password='testpass123',
+            first_name='Телеграм',
+            tg_id='123456789'
+        )
+
+        self.user_without_tg = User.objects.create(
+            email='notguser@example.com',
+            password='testpass123',
+            first_name='БезТелеграма'
+            # tg_id не указан
+        )
+
+        self.user_empty_tg = User.objects.create(
+            email='emptytg@example.com',
+            password='testpass123',
+            first_name='ПустойТелеграм',
+            tg_id=''
+        )
+
+        # Привычка для тестов (за 5 минут до текущего времени)
+        self.now = datetime.now(pytz.timezone("Asia/Novosibirsk"))
+        habit_time_obj = (self.now + timedelta(minutes=5)).time()
+
+        self.habit = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Парк',
+            time=habit_time_obj,  # Используем объект time
+            action='Тестовая пробежка',
+            duration=120,
+            frequency=1,
+            start_date=date.today()  # Начинается сегодня
+        )
+
+    @patch('habtracker.tasks.timezone.now')
+    def test_check_habits_now_simple(self, mock_now):
+        """Упрощенный тест check_habits_now"""
+        # Используем реальный datetime объект
+        mock_datetime = datetime(2024, 1, 1, 8, 55, 0, tzinfo=pytz.timezone("Asia/Novosibirsk"))
+        mock_now.return_value = mock_datetime
+
+        # Просто проверяем что функция выполняется без ошибок
+        try:
+            result = check_habits_now()
+            self.assertEqual(result, "Проверка завершена")
+        except Exception as e:
+            self.fail(f"check_habits_now вызвал исключение: {e}")
+
+    @patch('habtracker.tasks.send_tg_message')
+    @patch('habtracker.tasks.timezone')
+    def test_send_habit_reminders_no_telegram_user(self, mock_timezone, mock_send_tg):
+        """Тест отправки напоминаний пользователю без Telegram"""
+        # Создаем привычку для пользователя без Telegram
+        habit_no_tg = Habit.objects.create(
+            user=self.user_without_tg,
+            place='Дом',
+            time=time(9, 0, 0),  # Используем объект time
+            action='Привычка без Telegram',
+            duration=60,
+            frequency=1,
+            start_date=date.today()
+        )
+
+        # Мокаем время
+        mock_now = MagicMock()
+        mock_now.time.return_value = time(8, 55, 0)  # За 5 минут до 9:00
+        mock_now.date.return_value = date.today()
+        mock_timezone.now.return_value = mock_now
+
+        result = send_habit_reminders()
+
+        # Не должно быть отправок для пользователя без Telegram
+        self.assertIn('Отправлено: 0', result)
+        mock_send_tg.assert_not_called()
+
+    @patch('habtracker.tasks.send_tg_message')
+    @patch('habtracker.tasks.timezone')
+    def test_send_habit_reminders_wrong_time(self, mock_timezone, mock_send_tg):
+        """Тест отправки напоминаний в неподходящее время"""
+        # Мокаем время, которое не совпадает с временем привычки
+        wrong_time = time(10, 0, 0)  # Не подходит для привычки в 9:00
+        mock_now = MagicMock()
+        mock_now.time.return_value = wrong_time
+        mock_now.date.return_value = date.today()
+        mock_timezone.now.return_value = mock_now
+
+        result = send_habit_reminders()
+
+        # Не должно быть отправок в неподходящее время
+        self.assertIn('Отправлено: 0', result)
+        mock_send_tg.assert_not_called()
+
+    @patch('habtracker.tasks.send_tg_message')
+    @patch('habtracker.tasks.timezone')
+    def test_send_habit_reminders_future_start_date(self, mock_timezone, mock_send_tg):
+        """Тест отправки напоминаний для привычки с будущей датой начала"""
+        # Привычка с будущей датой начала
+        future_habit = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Офис',
+            time=time(9, 0, 0),  # Используем объект time
+            action='Будущая привычка',
+            duration=60,
+            frequency=1,
+            start_date=date.today() + timedelta(days=1)  # Начинается завтра
+        )
+
+        # Мокаем текущее время
+        mock_now = MagicMock()
+        mock_now.time.return_value = time(8, 55, 0)  # За 5 минут до 9:00
+        mock_now.date.return_value = date.today()
+        mock_timezone.now.return_value = mock_now
+
+        result = send_habit_reminders()
+
+        # Не должно быть отправок для привычек с будущей датой начала
+        self.assertIn('Отправлено: 0', result)
+        mock_send_tg.assert_not_called()
+
+    @patch('habtracker.tasks.send_tg_message')
+    @patch('habtracker.tasks.timezone')
+    def test_send_habit_reminders_wrong_frequency(self, mock_timezone, mock_send_tg):
+        """Тест отправки напоминаний в неподходящий день по периодичности"""
+        # Привычка с периодичностью 2 дня
+        habit_freq_2 = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Спортзал',
+            time=time(9, 0, 0),  # Используем объект time
+            action='Привычка раз в 2 дня',
+            duration=60,
+            frequency=2,
+            start_date=date.today() - timedelta(days=1)  # Началась вчера
+        )
+
+        # Мокаем текущее время (сегодня)
+        mock_now = MagicMock()
+        mock_now.time.return_value = time(8, 55, 0)  # За 5 минут до 9:00
+        mock_now.date.return_value = date.today()
+        mock_timezone.now.return_value = mock_now
+
+        result = send_habit_reminders()
+
+        # Не должно быть отправок (прошел 1 день, а нужно 2)
+        self.assertIn('Отправлено: 0', result)
+        mock_send_tg.assert_not_called()
+
+
+    def test_create_reminder_message_format(self):
+        """Тест формата сообщения напоминания"""
+        message = create_reminder_message(self.habit)
+
+        # Проверяем структуру сообщения
+        lines = message.split('\n')
+        self.assertGreaterEqual(len(lines), 8)  # Должно быть несколько строк
+
+        # Проверяем ключевые элементы
+        self.assertTrue(any('👋' in line for line in lines))
+        self.assertTrue(any('Привет' in line for line in lines))
+        self.assertTrue(any('Напоминание' in line for line in lines))
+        self.assertTrue(any('Место' in line for line in lines))
+        self.assertTrue(any('Действие' in line for line in lines))
+        self.assertTrue(any('Время' in line for line in lines))
+        self.assertTrue(any('Удачи' in line for line in lines))
+
+    @patch('habtracker.tasks.send_tg_message')
+    @patch('habtracker.tasks.timezone')
+    def test_send_habit_reminders_multiple_habits(self, mock_timezone, mock_send_tg):
+        """Тест отправки напоминаний для нескольких привычек"""
+        # Первая привычка на 09:00
+        habit1 = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Парк',
+            time=time(9, 0, 0),
+            action='Пробежка',
+            duration=120,
+            frequency=1,
+            start_date=date(2024, 1, 1)
+        )
+
+        # Вторая привычка на 09:00 (такое же время)
+        habit2 = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Бассейн',
+            time=time(9, 0, 0),  # То же самое время!
+            action='Плавание',
+            duration=45,
+            frequency=1,
+            start_date=date(2024, 1, 1)
+        )
+
+        # Мокаем время 08:55 (за 5 минут до обеих привычек)
+        mock_datetime = datetime(2024, 1, 1, 8, 55, 0, tzinfo=pytz.timezone("Asia/Novosibirsk"))
+        mock_timezone.now.return_value = mock_datetime
+
+        # Мокаем успешную отправку
+        mock_send_tg.return_value = True
+
+        result = send_habit_reminders()
+
+        # Должны отправиться обе привычки
+        self.assertIn('Отправлено: 2', result)
+        self.assertEqual(mock_send_tg.call_count, 2)
+
+    def test_create_reminder_message_time_format(self):
+        """Тест форматирования времени в сообщении"""
+        # Создаем привычку с разным временем
+        habit_am = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Дом',
+            time=time(8, 30, 0),  # 08:30
+            action='Утренняя зарядка',
+            duration=30,
+            frequency=1
+        )
+
+        habit_pm = Habit.objects.create(
+            user=self.user_with_tg,
+            place='Офис',
+            time=time(14, 45, 0),  # 14:45
+            action='Обеденная прогулка',
+            duration=15,
+            frequency=1
+        )
+
+        message_am = create_reminder_message(habit_am)
+        message_pm = create_reminder_message(habit_pm)
+
+        # Проверяем форматирование времени
+        self.assertIn('08:30', message_am)
+        self.assertIn('14:45', message_pm)
