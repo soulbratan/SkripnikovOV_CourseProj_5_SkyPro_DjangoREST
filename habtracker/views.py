@@ -19,7 +19,7 @@ class HabitListCreateAPIView(generics.ListCreateAPIView):
     """Список и создание привычек текущего пользователя"""
 
     serializer_class = HabitSerializer
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated]
     pagination_class = HabitPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = HabitFilter
