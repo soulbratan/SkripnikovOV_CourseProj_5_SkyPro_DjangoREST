@@ -15,7 +15,7 @@ def create_reminder_message(habit):
 
 Напоминание о твоей привычке:
 Место📍 {habit.place}
-Начало🕐 {habit.time.strftime("%H:%M")}
+Начало🕐 {habit.time.strftime('%H:%M')}
 Действие💪 {habit.action}
 Время⏱ {habit.duration} секунд
 
@@ -35,7 +35,7 @@ def send_habit_reminders():
     current_time = now.time()
     today = now.date()
 
-    print(f"⏰ Проверка привычек в {current_time.strftime("%H:%M")}")
+    print(f"⏰ Проверка привычек в {current_time.strftime('%H:%M')}")
 
     # Все привычки с Telegram пользователями
     habits = Habit.objects.filter(
@@ -81,7 +81,7 @@ def check_habits_now():
     current_time = now.time()
     today = now.date()
 
-    print(f"🔍 Проверка в {current_time.strftime("%H:%M:%S")}")
+    print(f"🔍 Проверка в {current_time.strftime('%H:%M:%S')}")
 
     habits = Habit.objects.all().select_related("user")
 
@@ -96,6 +96,6 @@ def check_habits_now():
         elif days_passed >= 0 and days_passed % habit.frequency == 0:
             status = "⚠️ Подходит по дате"
 
-        print(f"{status} {habit.action} - {habit_time.strftime("%H:%M")} (через {time_diff} мин)")
+        print(f"{status} {habit.action} - {habit_time.strftime('%H:%M')} (через {time_diff} мин)")
 
     return "Проверка завершена"
