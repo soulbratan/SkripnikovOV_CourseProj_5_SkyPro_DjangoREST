@@ -39,7 +39,6 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_HOST: localhost
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
@@ -68,6 +67,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           POSTGRES_HOST: localhost
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: |
           poetry run python manage.py migrate
           poetry run python manage.py test
