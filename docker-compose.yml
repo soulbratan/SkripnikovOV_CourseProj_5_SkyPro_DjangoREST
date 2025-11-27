@@ -1,10 +1,8 @@
-version: '3.9'
-
 services:
   web:
     build: .
     container_name: lms_web
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 && python manage.py runserver"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -14,16 +12,19 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_HOST=db
-      - DJANGO_ALLOWED_HOSTS=0.0.0.0 localhost [::1]
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,web,nginx
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env
 
   nginx:
     build:
       context: ./nginx
+    container_name: nginx-1
     ports:
       - "80:80"
     volumes:
@@ -34,16 +35,19 @@ services:
 
   db:
     image: postgres:16
+    container_name: db-1
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     env_file:
-      - ./.env
+      - .env
     expose:
       - "5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}" ]
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -53,7 +57,7 @@ services:
     image: redis:7-alpine
     container_name: lms_redis
     env_file:
-      - ./.env
+      - .env
     expose:
       - "6379"
     ports:
@@ -73,9 +77,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
     restart: unless-stopped
 
   celery_beat:
@@ -92,9 +99,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

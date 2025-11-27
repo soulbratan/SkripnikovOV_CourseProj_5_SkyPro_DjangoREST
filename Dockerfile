@@ -10,6 +10,12 @@ COPY pyproject.toml poetry.lock ./
 
 RUN poetry install --no-root
 
+RUN poetry add drf-yasg
+
 COPY . .
+
+RUN mkdir -p static staticfiles
+
+RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
