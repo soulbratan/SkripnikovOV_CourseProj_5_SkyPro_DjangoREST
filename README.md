@@ -4,6 +4,18 @@
 **Проект:** Курсовая работа по Django  
 **Описание:** Бэкенд-часть SPA веб-приложения для трекера полезных привычек, вдохновленного книгой Джеймса Клира "Атомные привычки"
 
+## 🌐 Демо сервер
+
+**Адрес развернутого приложения:** [http://your-server-ip/](http://your-server-ip/)
+
+**Доступные эндпоинты:**
+- 📚 API документация: [http://158.160.203.191/redoc/](http://158.160.203.191/redoc/)
+- 🔍 Swagger UI: [http://158.160.203.191/swagger/](http://158.160.203.191/swagger/)
+- ⚙️ Админ-панель: [http://158.160.203.191/admin/](http://158.160.203.191/admin/)
+
+*Замените `158.160.203.191` на реальный IP вашего сервера*
+
+
 ## 📋 Оглавление
 
 - [Функциональность](#-функциональность)
@@ -45,6 +57,12 @@
 - **Celery** - асинхронные задачи
 - **Simple JWT** - аутентификация
 
+### Инфраструктура
+- **Docker & Docker Compose** - контейнеризация
+- **Nginx** - веб-сервер и прокси
+- **GitHub Actions** - CI/CD пайплайн
+- **Docker Hub** - реестр образов
+
 ### Дополнительные компоненты
 - **Django Filter** - фильтрация данных
 - **DRF Yasg** - Swagger документация
@@ -82,6 +100,52 @@ git clone https://github.com/soulbratan/SkripnikovOV_CourseProj_5_SkyPro_DjangoR
  
  celery -A config beat --loglevel=info
 ```
+
+### ИЛИ. Запустите через DOCKER
+```
+ # Сборка и запуск контейнеров
+   docker-compose up --build -d
+ 
+ # Просмотр логов
+   docker-compose logs -f
+
+ # Остановка
+   docker-compose down
+```
+
+## 🚀 Запуск на удаленном сервере
+
+### Предварительные требования
+- Сервер с Ubuntu 20.04+ или Debian 11+
+- Минимум 2GB RAM, 20GB дискового пространства
+- Открытые порты: 80 (HTTP), 443 (HTTPS при необходимости)
+- Доступ по SSH
+
+### 1. Подготовка сервера
+
+#### Обновление системы:
+```commandline
+   sudo apt update
+   
+   sudo apt upgrade
+```
+
+#### Установка Docker:
+**Инструкция офф. сайта:** [УСТАНОВКА DOCKER](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository.)
+
+Добавление пользователя в группу docker
+```sudo usermod -aG docker $USER```
+
+#### Настройка файрвола:
+```commandline
+   sudo ufw status
+   sudo ufw enable
+   sudo ufw allow 80/tcp
+   sudo ufw allow 443/tcp
+   sudo ufw allow 22/tcp
+   sudo ufw status
+```
+
 
 ## 📦 API Эндпоинты
 
@@ -209,7 +273,8 @@ coverage html
 **Назначение:** Отправка Telegram уведомлений за 5 минут до времени выполнения привычки
 
 **Расписание:** Запускается каждую минуту
-```python
+```
+python
 "send-habit-reminders": {
     "task": "habtracker.tasks.send_habit_reminders",
     "schedule": timedelta(minutes=1),
