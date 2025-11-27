@@ -39,6 +39,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_HOST: localhost
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
